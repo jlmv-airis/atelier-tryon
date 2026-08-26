@@ -28,8 +28,6 @@ jobs:
   storage-and-model:
     name: 1 · Supabase Storage + modelo por defecto
     runs-on: ubuntu-latest
-    outputs:
-      model_url: ${{ steps.gen.outputs.url }}
     defaults:
       run:
         working-directory: backend
@@ -94,7 +92,7 @@ jobs:
               "SUPABASE_URL": os.environ["SUPABASE_URL"],
               "SUPABASE_SERVICE_KEY": os.environ["SUPABASE_SERVICE_KEY"],
               "SUPABASE_BUCKET": "tryon",
-              "DEFAULT_PERSON_IMAGE_URL": "${{ needs.storage-and-model.outputs.model_url }}",
+              "DEFAULT_PERSON_IMAGE_URL": os.environ["SUPABASE_URL"].rstrip("/") + "/storage/v1/object/public/tryon/models/default.jpg",
               "CORS_ORIGINS": "${{ vars.FRONTEND_URL || '*' }}",
               "REFINE_REQUIRED": "false",
               "JOB_TTL_SECONDS": "86400",
@@ -139,6 +137,9 @@ jobs:
         with:
           node-version: 20
       - run: npm i -g vercel@latest
+      - name: Enlazar proyecto
+        working-directory: frontend
+        run: vercel link --yes --token=${{ secrets.VERCEL_TOKEN }}
       - name: Cargar NEXT_PUBLIC_API_URL (production + preview)
         working-directory: frontend
         run: |
