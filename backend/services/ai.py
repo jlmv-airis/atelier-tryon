@@ -31,7 +31,7 @@ def improve_prompt(description: str, base_image_url: str) -> str:
             return call_claude(description, image_url=base_image_url)
         return hf_client.improve_prompt(SYSTEM_PROMPT, description, base_image_url)
     except Exception as exc:
-        logger.warning("mejora de prompt fallo (%s); usando prompt fijo", exc)
+        logger.warning("mejora de prompt fallo (%s); usando prompt fijo", hf_client.describe_error(exc))
         return FALLBACK_PROMPT
 
 
@@ -46,7 +46,7 @@ def refine(base_image: bytes, base_image_url: str, prompt: str) -> bytes | None:
     except Exception as exc:
         if config.REFINE_REQUIRED:
             raise
-        logger.warning("refinado fallo (%s); se entrega la imagen base", exc)
+        logger.warning("refinado fallo (%s); se entrega la imagen base", hf_client.describe_error(exc))
         return None
 
 

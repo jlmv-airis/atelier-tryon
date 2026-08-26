@@ -57,6 +57,7 @@ def tryon(garment: bytes, person: bytes, description: str) -> bytes:
     """Try-on via Space publico de IDM-VTON (ZeroGPU). Devuelve JPEG."""
     person_path = _tmp_file(person, ".jpg")
     garment_path = _tmp_file(garment, ".jpg")
+    client = None
     try:
         client = _space_client()
         editor_value = {"background": handle_file(person_path), "layers": [], "composite": None}
@@ -72,8 +73,28 @@ def tryon(garment: bytes, person: bytes, description: str) -> bytes:
         )
         return _path_to_jpeg(_first_path(result))
     finally:
+        _close_quietly(client)   # detiene el hilo de heartbeat de gradio_client
         os.unlink(person_path)
         os.unlink(garment_path)
+
+
+def _close_quietly(client) -> None:
+    close = getattr(client, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception:
+            pass
+
+
+def describe_error(exc: Exception) -> str:
+    """Texto util para logs: tipo, mensaje y, si es HTTP, status y cuerpo."""
+    parts = [type(exc).__name__, str(exc)[:300]]
+    response = getattr(exc, "response", None)
+    if response is not None:
+        parts.append(f"status={getattr(response, 'status_code', '?')}")
+        parts.append(f"body={getattr(response, 'text', '')[:300]}")
+    return " | ".join(p for p in parts if p)
 
 
 def refine(image: bytes, prompt: str) -> bytes:
