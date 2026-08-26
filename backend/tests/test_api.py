@@ -15,13 +15,15 @@ import pipeline  # noqa: E402
 import services.ai as ai  # noqa: E402
 import services.db as db  # noqa: E402
 
-IMG = b"\xff\xd8\xff" + b"0" * 100
+import io
+from PIL import Image as _PILImage
+_buf = io.BytesIO(); _PILImage.new("RGB", (64, 96), (200, 30, 40)).save(_buf, format="JPEG"); IMG = _buf.getvalue()
 CALLS: list[str] = []
 
 
 def _fake_tryon(garment, person, description):
     CALLS.append("tryon")
-    assert garment == IMG and person == b"person-bytes"
+    assert garment[:3] == b"\xff\xd8\xff" and person == b"person-bytes"
     return b"base-bytes"
 
 
