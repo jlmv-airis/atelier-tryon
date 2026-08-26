@@ -1,0 +1,30 @@
+# Blueprint de Render (plan Free, sin tarjeta). Render lo detecta al importar el repo.
+services:
+  - type: web
+    name: tryon-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: false          # despliega GitHub Actions
+    envVars:
+      - key: AI_PROVIDER
+        value: hf
+      - key: HF_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: tryon
+      - key: DEFAULT_PERSON_IMAGE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: REFINE_REQUIRED
+        value: "false"
+      - key: JOB_TTL_SECONDS
+        value: "86400"
