@@ -44,12 +44,21 @@ def _first_path(result) -> str:
     return str(item)
 
 
+def _space_client() -> Client:
+    """gradio_client >= 1.x usa `token`; versiones antiguas usaban `hf_token`."""
+    token = config.HF_TOKEN or None
+    try:
+        return Client(config.HF_TRYON_SPACE, token=token, verbose=False)
+    except TypeError:
+        return Client(config.HF_TRYON_SPACE, hf_token=token, verbose=False)
+
+
 def tryon(garment: bytes, person: bytes, description: str) -> bytes:
     """Try-on via Space publico de IDM-VTON (ZeroGPU). Devuelve JPEG."""
     person_path = _tmp_file(person, ".jpg")
     garment_path = _tmp_file(garment, ".jpg")
     try:
-        client = Client(config.HF_TRYON_SPACE, hf_token=config.HF_TOKEN or None, verbose=False)
+        client = _space_client()
         editor_value = {"background": handle_file(person_path), "layers": [], "composite": None}
         result = client.predict(
             editor_value,
