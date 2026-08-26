@@ -1,4 +1,4 @@
-name: Bootstrap · Supabase storage, modelo por defecto, schema, Render y Vercel
+name: Bootstrap · Supabase storage, modelo por defecto, schema y Render
 
 # Ejecucion manual, idempotente (se puede repetir). Requiere los secrets/variables de FREE-STACK.md.
 
@@ -123,35 +123,3 @@ jobs:
             sleep 10
           done
           echo "backend no quedo sano"; exit 1
-
-  vercel:
-    name: 4 · Variables Vercel + deploy
-    runs-on: ubuntu-latest
-    needs: render
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm i -g vercel@latest
-      - name: Enlazar proyecto
-        working-directory: frontend
-        run: vercel link --yes --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Cargar NEXT_PUBLIC_API_URL (production + preview)
-        working-directory: frontend
-        run: |
-          for ENV in production preview; do
-            vercel env rm NEXT_PUBLIC_API_URL "$ENV" --yes --token=${{ secrets.VERCEL_TOKEN }} 2>/dev/null || true
-            printf '%s' "${{ vars.BACKEND_URL }}" | vercel env add NEXT_PUBLIC_API_URL "$ENV" --token=${{ secrets.VERCEL_TOKEN }}
-          done
-      - name: Deploy production
-        working-directory: frontend
-        run: |
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "FRONTEND_URL=$URL"
-          echo "### Frontend: $URL" >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,4 @@
-name: Frontend · build & deploy (Vercel)
+name: Frontend · build check (deploy lo hace Vercel en cada push)
 
 on:
   push:
@@ -14,10 +14,6 @@ on:
 concurrency:
   group: frontend-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
   build:
@@ -37,45 +33,12 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_API_URL: ${{ vars.BACKEND_URL }}
-
-  preview:
-    name: Deploy preview
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm i -g vercel@latest
-      - run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
-      - run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: ${{ vars.BACKEND_URL }}
-      - run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
-
-  production:
-    name: Deploy production
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: production
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm i -g vercel@latest
-      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
-      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: ${{ vars.BACKEND_URL }}
-      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: frontend
+      - name: Verificar frontend en produccion
+        if: github.event_name != 'pull_request' && vars.FRONTEND_URL != ''
+        run: |
+          sleep 90   # Vercel despliega en paralelo por su integracion Git
+          for i in $(seq 1 12); do
+            if curl -fsS -o /dev/null "${{ vars.FRONTEND_URL }}"; then echo "frontend OK"; exit 0; fi
+            sleep 10
+          done
+          echo "frontend no responde"; exit 1
