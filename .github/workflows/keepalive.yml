@@ -1,0 +1,17 @@
+name: Keepalive · evita que Render Free se duerma
+
+# Render Free duerme tras 15 min sin trafico (arranque en frio ~50 s).
+# Este ping cada 14 min lo mantiene despierto en horario de uso (06:00-24:00 America/Mexico_City = 12:00-06:00 UTC).
+# Desactivar en Actions -> Keepalive -> "..." -> Disable workflow si no se quiere gastar minutos.
+
+on:
+  schedule:
+    - cron: "*/14 12-23,0-5 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS -m 60 "${{ vars.BACKEND_URL }}/health" || echo "backend dormido o caido"

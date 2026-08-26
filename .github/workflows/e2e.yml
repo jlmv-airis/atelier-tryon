@@ -1,0 +1,55 @@
+name: E2E · try-on real contra produccion
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 1"   # lunes 12:00 UTC, smoke semanal
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Health
+        run: |
+          BODY=$(curl -fsS "${{ vars.BACKEND_URL }}/health"); echo "$BODY"
+          echo "$BODY" | grep -q '"status":"ok"'
+          echo "$BODY" | grep -q '"missing_env":\[\]'
+          echo "$BODY" | grep -q '"storage":true'
+      - name: Crear job con la prenda de prueba
+        id: job
+        run: |
+          RESP=$(curl -fsS -X POST "${{ vars.BACKEND_URL }}/tryon" \
+            -F "image=@assets/prenda-test.jpg;type=image/jpeg" \
+            -F "description=white silk blouse" -F "user_id=e2e-ci")
+          echo "$RESP"
+          echo "id=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')" >> "$GITHUB_OUTPUT"
+      - name: Esperar done (max 8 min)
+        run: |
+          for i in $(seq 1 48); do
+            JOB=$(curl -fsS "${{ vars.BACKEND_URL }}/tryon/${{ steps.job.outputs.id }}")
+            STATUS=$(echo "$JOB" | python3 -c 'import sys,json;print(json.load(sys.stdin)["status"])')
+            STAGE=$(echo "$JOB" | python3 -c 'import sys,json;print(json.load(sys.stdin)["stage"])')
+            echo "[$i] $STATUS / $STAGE"
+            if [ "$STATUS" = "done" ]; then echo "$JOB" > job.json; exit 0; fi
+            if [ "$STATUS" = "error" ]; then echo "$JOB"; exit 1; fi
+            sleep 10
+          done
+          echo "timeout"; exit 1
+      - name: Verificar URLs finales en R2 y descargar
+        run: |
+          FINAL=$(python3 -c 'import json;print(json.load(open("job.json"))["final_image_url"])')
+          BASE=$(python3 -c 'import json;print(json.load(open("job.json"))["base_image_url"])')
+          echo "$FINAL" | grep -Eq "supabase.co/storage|r2.dev" || { echo "final no esta en storage propio: $FINAL"; exit 1; }
+          curl -fsS -o final.jpg "$FINAL"; curl -fsS -o base.png "$BASE"
+          python3 -c 'import json;j=json.load(open("job.json"));print("PROMPT:",j["improved_prompt"])'
+          echo "final=$FINAL" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-result
+          path: |
+            job.json
+            final.jpg
+            base.png
+          retention-days: 14
