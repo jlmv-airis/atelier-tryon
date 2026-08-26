@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 import config
 import jobs
+from services.images import normalize_image
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tryon")
@@ -35,7 +36,10 @@ async def _read_image(upload: UploadFile | None, field: str) -> bytes | None:
         raise HTTPException(400, f"{field}: archivo vacio")
     if len(data) > MAX_BYTES:
         raise HTTPException(413, f"{field}: excede {MAX_BYTES // (1024 * 1024)} MB")
-    return data
+    try:
+        return normalize_image(data)
+    except ValueError as exc:
+        raise HTTPException(400, f"{field}: {exc}") from exc
 
 
 @app.get("/health")
