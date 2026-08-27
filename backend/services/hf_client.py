@@ -89,24 +89,28 @@ def _close_quietly(client) -> None:
 
 def describe_error(exc: Exception) -> str:
     """Texto util para logs: tipo, mensaje y, si es HTTP, status y cuerpo."""
-    parts = [type(exc).__name__, str(exc)[:300]]
+    parts = [type(exc).__name__, " ".join(str(exc).split())[:400]]
     response = getattr(exc, "response", None)
     if response is not None:
         parts.append(f"status={getattr(response, 'status_code', '?')}")
-        parts.append(f"body={getattr(response, 'text', '')[:300]}")
+        parts.append("body=" + " ".join(str(getattr(response, 'text', '')).split())[:300])
     return " | ".join(p for p in parts if p)
 
 
 def refine(image: bytes, prompt: str) -> bytes:
-    """Refinado img2img con la Inference API. Devuelve JPEG."""
-    output = _inference().image_to_image(
-        image,
-        prompt=prompt,
-        model=config.HF_REFINE_MODEL,
-        strength=config.DIFFUSION_PROMPT_STRENGTH,
-        num_inference_steps=config.DIFFUSION_STEPS,
-        guidance_scale=max(config.DIFFUSION_GUIDANCE, 5.0),
-    )
+    """Refinado img2img (modelos de edicion tipo FLUX Kontext/klein). Devuelve JPEG."""
+    client = _inference()
+    try:
+        output = client.image_to_image(
+            image,
+            prompt=prompt,
+            model=config.HF_REFINE_MODEL,
+            guidance_scale=config.DIFFUSION_GUIDANCE,
+            num_inference_steps=config.DIFFUSION_STEPS,
+        )
+    except (TypeError, ValueError):
+        # Algunos proveedores rechazan parametros extra: reintento solo con el prompt
+        output = client.image_to_image(image, prompt=prompt, model=config.HF_REFINE_MODEL)
     return _pil_to_jpeg(output)
 
 
