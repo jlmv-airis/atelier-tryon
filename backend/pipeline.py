@@ -3,6 +3,7 @@ from typing import Callable
 
 import config
 from services import ai
+from services.category import detect as detect_category
 from services.storage import download, upload_bytes
 
 ProgressFn = Callable[[str], None]
@@ -14,6 +15,7 @@ class TryOnResult:
     improved_prompt: str
     final_image_url: str
     refined: bool
+    category: str
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -43,15 +45,22 @@ def _store(job_id: str, name: str, data: bytes) -> str:
     return url
 
 
+def resolve_category(requested: str | None, garment_image: bytes, garment_description: str) -> str:
+    wanted = requested if requested and requested != "auto" else config.TRYON_CATEGORY
+    return detect_category(wanted, garment_description, classify=lambda: ai.classify_garment(garment_image))
+
+
 def run_pipeline(
     job_id: str,
     garment_image: bytes,
     person_image: bytes | None,
     garment_description: str,
     on_progress: ProgressFn = lambda stage: None,
+    category: str | None = None,
 ) -> TryOnResult:
     on_progress("tryon")
-    base = ai.tryon(garment_image, resolve_person(person_image), garment_description)
+    category = resolve_category(category, garment_image, garment_description)
+    base = ai.tryon(garment_image, resolve_person(person_image), garment_description, category)
     base_url = _store(job_id, "base.jpg", base)
 
     on_progress("claude")
@@ -61,4 +70,4 @@ def run_pipeline(
     refined = ai.refine(base, base_url, prompt)
     final_url = _store(job_id, "final.jpg", refined) if refined else base_url
 
-    return TryOnResult(base_url, prompt, final_url, refined is not None)
+    return TryOnResult(base_url, prompt, final_url, refined is not None, category)

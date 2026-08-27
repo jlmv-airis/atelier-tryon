@@ -14,7 +14,7 @@ logger = logging.getLogger("tryon.jobs")
 STAGES = ["queued", "tryon", "claude", "refine", "done", "error"]
 PUBLIC_FIELDS = (
     "id", "user_id", "status", "stage", "description", "garment_url", "person_url",
-    "base_image_url", "improved_prompt", "final_image_url", "refined", "error", "created_at", "updated_at",
+    "base_image_url", "improved_prompt", "final_image_url", "refined", "category", "error", "created_at", "updated_at",
 )
 
 
@@ -28,7 +28,7 @@ def public_view(row: dict | None) -> dict | None:
     return {k: row.get(k) for k in PUBLIC_FIELDS}
 
 
-def create_job(user_id: str, garment: bytes, person: bytes | None, description: str) -> dict:
+def create_job(user_id: str, garment: bytes, person: bytes | None, description: str, category: str = "auto") -> dict:
     job_id = uuid.uuid4().hex
     garment_url = upload_bytes(f"jobs/{job_id}/garment.jpg", garment)
     person_url = upload_bytes(f"jobs/{job_id}/person.jpg", person) if person else None
@@ -38,6 +38,7 @@ def create_job(user_id: str, garment: bytes, person: bytes | None, description: 
         "status": "queued",
         "stage": "queued",
         "description": description,
+        "category": category,
         "garment_url": garment_url,
         "person_url": person_url,
         "created_at": _now_iso(),
@@ -51,9 +52,9 @@ def _set_stage(job_id: str, stage: str) -> None:
     get_store().update(job_id, {"status": "processing", "stage": stage, "updated_at": _now_iso()})
 
 
-def process_job(job_id: str, garment: bytes, person: bytes | None, description: str) -> None:
+def process_job(job_id: str, garment: bytes, person: bytes | None, description: str, category: str = "auto") -> None:
     try:
-        result = run_pipeline(job_id, garment, person, description, on_progress=lambda s: _set_stage(job_id, s))
+        result = run_pipeline(job_id, garment, person, description, on_progress=lambda s: _set_stage(job_id, s), category=category)
         get_store().update(job_id, {"status": "done", "stage": "done", "updated_at": _now_iso(), **result.to_dict()})
         logger.info("job %s done -> %s", job_id, result.final_image_url)
     except Exception as exc:

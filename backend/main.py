@@ -58,6 +58,7 @@ async def create_tryon(
     person: UploadFile | None = File(None),
     description: str = Form(""),
     user_id: str = Form("anonymous"),
+    category: str = Form("auto"),
 ):
     missing = config.validate_config()
     if missing:
@@ -69,8 +70,8 @@ async def create_tryon(
     if not config.storage_enabled():
         raise HTTPException(500, "Storage no configurado (SUPABASE_URL + SUPABASE_SERVICE_KEY)")
 
-    job = jobs.create_job(user_id, garment, person_bytes, description)
-    background.add_task(jobs.process_job, job["id"], garment, person_bytes, description)
+    job = jobs.create_job(user_id, garment, person_bytes, description, category)
+    background.add_task(jobs.process_job, job["id"], garment, person_bytes, description, category)
     return jobs.public_view(job)
 
 

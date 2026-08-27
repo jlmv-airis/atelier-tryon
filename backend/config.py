@@ -21,6 +21,10 @@ AI_PROVIDER = _env("AI_PROVIDER", "hf").lower()
 HF_TOKEN = _env("HF_TOKEN")
 HF_TRYON_SPACE = _env("HF_TRYON_SPACE", "yisol/IDM-VTON")
 HF_TRYON_API_NAME = _env("HF_TRYON_API_NAME", "/tryon")
+HF_TRYON_DC_SPACE = _env("HF_TRYON_DC_SPACE", "levihsu/OOTDiffusion")   # vestidos y parte de abajo
+HF_TRYON_DC_API_NAME = _env("HF_TRYON_DC_API_NAME", "/process_dc")
+HF_TRYON_DC_STEPS = int(_env("HF_TRYON_DC_STEPS", "20"))
+HF_TRYON_DC_SCALE = float(_env("HF_TRYON_DC_SCALE", "2.0"))
 HF_REFINE_MODEL = _env("HF_REFINE_MODEL", "black-forest-labs/FLUX.1-Kontext-dev")
 HF_TEXT2IMG_MODEL = _env("HF_TEXT2IMG_MODEL", "black-forest-labs/FLUX.1-schnell")
 HF_LLM_MODEL = _env("HF_LLM_MODEL", "Qwen/Qwen3.5-9B")
@@ -40,7 +44,7 @@ DIFFUSION_PROMPT_STRENGTH = float(_env("DIFFUSION_PROMPT_STRENGTH", "0.35"))
 DIFFUSION_STEPS = int(_env("DIFFUSION_STEPS", "28"))
 DIFFUSION_GUIDANCE = float(_env("DIFFUSION_GUIDANCE", "3.0"))
 TRYON_DENOISE_STEPS = int(_env("TRYON_DENOISE_STEPS", "30"))
-TRYON_CATEGORY = _env("TRYON_CATEGORY", "upper_body")
+TRYON_CATEGORY = _env("TRYON_CATEGORY", "auto")   # auto | upper_body | lower_body | dresses
 REFINE_REQUIRED = _bool("REFINE_REQUIRED", False)   # False: si el refinado falla, se entrega la base
 
 # Mejora de prompt: Claude si hay key (pago), si no LLM de Hugging Face (gratis)
