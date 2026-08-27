@@ -35,6 +35,7 @@ def call_tryon_model(
     garment_image: ImageInput,
     person_image: ImageInput | None = None,
     garment_description: str = "",
+    category: str | None = None,
 ) -> str:
     """Genera la imagen base de try-on. Devuelve URL."""
     person = person_image if person_image is not None else config.DEFAULT_PERSON_IMAGE_URL
@@ -44,7 +45,7 @@ def call_tryon_model(
         "human_img": _to_replicate_input(person, "person.jpg"),
         "garm_img": _to_replicate_input(garment_image, "garment.jpg"),
         "garment_des": garment_description or config.DEFAULT_GARMENT_DESCRIPTION,
-        "category": config.TRYON_CATEGORY,
+        "category": category or ("upper_body" if config.TRYON_CATEGORY == "auto" else config.TRYON_CATEGORY),
         "is_checked": True,
         "is_checked_crop": True,
         "denoise_steps": config.TRYON_DENOISE_STEPS,

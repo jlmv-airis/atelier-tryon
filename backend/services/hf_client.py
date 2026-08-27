@@ -40,6 +40,8 @@ def _path_to_jpeg(path: str) -> bytes:
 
 def _first_path(result) -> str:
     item = result[0] if isinstance(result, (list, tuple)) else result
+    if isinstance(item, dict) and isinstance(item.get("image"), dict):   # salida tipo Gallery
+        item = item["image"]
     if isinstance(item, dict):
         item = item.get("path") or item.get("url")
     if not item or not Path(str(item)).exists():
@@ -47,38 +49,75 @@ def _first_path(result) -> str:
     return str(item)
 
 
-def _space_client() -> Client:
+def _space_client(space: str) -> Client:
     """gradio_client >= 1.x usa `token`; versiones antiguas usaban `hf_token`."""
     token = config.HF_TOKEN or None
     try:
-        return Client(config.HF_TRYON_SPACE, token=token, verbose=False)
+        return Client(space, token=token, verbose=False)
     except TypeError:
-        return Client(config.HF_TRYON_SPACE, hf_token=token, verbose=False)
+        return Client(space, hf_token=token, verbose=False)
 
 
-def tryon(garment: bytes, person: bytes, description: str) -> bytes:
-    """Try-on via Space publico de IDM-VTON (ZeroGPU). Devuelve JPEG."""
+DC_CATEGORY = {"upper_body": "Upper-body", "lower_body": "Lower-body", "dresses": "Dress"}
+
+
+def tryon(garment: bytes, person: bytes, description: str, category: str = "upper_body") -> bytes:
+    """Try-on: IDM-VTON para parte superior; OOTDiffusion (cuerpo completo) para vestidos y parte de abajo."""
     person_path = _tmp_file(person, ".jpg")
     garment_path = _tmp_file(garment, ".jpg")
     client = None
     try:
-        client = _space_client()
-        editor_value = {"background": handle_file(person_path), "layers": [], "composite": None}
-        result = client.predict(
-            editor_value,
-            handle_file(garment_path),
-            description or config.DEFAULT_GARMENT_DESCRIPTION,
-            True,                     # is_checked: auto-mask
-            False,                    # is_checked_crop
-            config.TRYON_DENOISE_STEPS,
-            42,                       # seed
-            api_name=config.HF_TRYON_API_NAME,
-        )
+        if category == "upper_body":
+            client = _space_client(config.HF_TRYON_SPACE)
+            result = _predict_idm(client, person_path, garment_path, description)
+        else:
+            client = _space_client(config.HF_TRYON_DC_SPACE)
+            result = _predict_ootd(client, person_path, garment_path, category)
         return _path_to_jpeg(_first_path(result))
     finally:
         _close_quietly(client)   # detiene el hilo de heartbeat de gradio_client
         os.unlink(person_path)
         os.unlink(garment_path)
+
+
+def _predict_idm(client: Client, person_path: str, garment_path: str, description: str):
+    editor_value = {"background": handle_file(person_path), "layers": [], "composite": None}
+    return client.predict(
+        editor_value,
+        handle_file(garment_path),
+        description or config.DEFAULT_GARMENT_DESCRIPTION,
+        True,                     # is_checked: auto-mask
+        False,                    # is_checked_crop
+        config.TRYON_DENOISE_STEPS,
+        42,                       # seed
+        api_name=config.HF_TRYON_API_NAME,
+    )
+
+
+def _predict_ootd(client: Client, person_path: str, garment_path: str, category: str):
+    return client.predict(
+        vton_img=handle_file(person_path),
+        garm_img=handle_file(garment_path),
+        category=DC_CATEGORY.get(category, "Upper-body"),
+        n_samples=1,
+        n_steps=config.HF_TRYON_DC_STEPS,
+        image_scale=config.HF_TRYON_DC_SCALE,
+        seed=42,
+        api_name=config.HF_TRYON_DC_API_NAME,
+    )
+
+
+def classify_garment(image: bytes) -> str | None:
+    """Clasifica la prenda con el LLM de vision: upper_body | lower_body | dresses."""
+    import base64
+
+    data_url = "data:image/jpeg;base64," + base64.b64encode(image).decode()
+    content = [
+        {"type": "image_url", "image_url": {"url": data_url}},
+        {"type": "text", "text": "Classify this garment. Answer with exactly one word: upper_body, lower_body or dresses."},
+    ]
+    answer = _chat(config.HF_LLM_MODEL, content, "You are a fashion catalog classifier. Reply with one word only.")
+    return answer.strip().lower().split()[0].strip(".,")
 
 
 def _close_quietly(client) -> None:

@@ -16,13 +16,21 @@ FALLBACK_PROMPT = (
 )
 
 
-def tryon(garment: bytes, person: bytes, description: str) -> bytes:
+def tryon(garment: bytes, person: bytes, description: str, category: str = "upper_body") -> bytes:
     if config.AI_PROVIDER == "replicate":
         from services.replicate_client import call_tryon_model
 
-        url = call_tryon_model(garment, person, description)
+        url = call_tryon_model(garment, person, description, category)
         return download(url)[0]
-    return hf_client.tryon(garment, person, description)
+    return hf_client.tryon(garment, person, description, category)
+
+
+def classify_garment(garment: bytes) -> str | None:
+    try:
+        return hf_client.classify_garment(garment)
+    except Exception as exc:
+        logger.warning("clasificacion de prenda fallo (%s)", hf_client.describe_error(exc))
+        return None
 
 
 CONSISTENCY_SUFFIX = (
