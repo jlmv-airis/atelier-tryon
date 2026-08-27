@@ -27,12 +27,14 @@ create table if not exists public.tryon_jobs (
   improved_prompt text,
   final_image_url text,
   refined boolean,
+  category text,
   error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.tryon_jobs add column if not exists refined boolean;
+alter table public.tryon_jobs add column if not exists category text;
 
 create index if not exists tryon_jobs_user_created_idx on public.tryon_jobs (user_id, created_at desc);
 create index if not exists tryon_jobs_status_idx on public.tryon_jobs (status);
