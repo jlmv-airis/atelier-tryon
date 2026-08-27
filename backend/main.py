@@ -21,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
 MAX_BYTES = 12 * 1024 * 1024
 TERMINAL = {"done", "error"}
 
@@ -29,8 +28,6 @@ TERMINAL = {"done", "error"}
 async def _read_image(upload: UploadFile | None, field: str) -> bytes | None:
     if upload is None:
         return None
-    if upload.content_type not in ALLOWED_TYPES:
-        raise HTTPException(400, f"{field}: tipo no soportado ({upload.content_type})")
     data = await upload.read()
     if not data:
         raise HTTPException(400, f"{field}: archivo vacio")
