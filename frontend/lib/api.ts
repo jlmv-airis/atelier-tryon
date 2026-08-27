@@ -12,6 +12,8 @@ export interface TryOnJob {
   base_image_url: string | null;
   improved_prompt: string | null;
   final_image_url: string | null;
+  refined?: boolean | null;
+  category?: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -39,11 +41,19 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-export async function createTryOn(garment: File, person: File | null, description: string): Promise<TryOnJob> {
+export type GarmentCategory = "auto" | "upper_body" | "lower_body" | "dresses";
+
+export async function createTryOn(
+  garment: File,
+  person: File | null,
+  description: string,
+  category: GarmentCategory = "auto",
+): Promise<TryOnJob> {
   const form = new FormData();
   form.append("image", garment, garment.name || "garment.jpg");
   if (person) form.append("person", person, person.name || "person.jpg");
   form.append("description", description);
+  form.append("category", category);
   form.append("user_id", getUserId());
   const res = await fetch(`${API_URL}/tryon`, { method: "POST", body: form });
   if (!res.ok) throw new Error(await parseError(res));
