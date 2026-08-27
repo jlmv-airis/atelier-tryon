@@ -21,7 +21,7 @@ _buf = io.BytesIO(); _PILImage.new("RGB", (64, 96), (200, 30, 40)).save(_buf, fo
 CALLS: list[str] = []
 
 
-def _fake_tryon(garment, person, description):
+def _fake_tryon(garment, person, description, category="upper_body"):
     CALLS.append("tryon")
     assert garment[:3] == b"\xff\xd8\xff" and person == b"person-bytes"
     return b"base-bytes"
@@ -118,3 +118,38 @@ def test_tryon_rejects_bad_type():
 def test_job_not_found():
     with TestClient(main.app) as client:
         assert client.get("/tryon/nope").status_code == 404
+
+
+def test_category_detection():
+    from services.category import detect, from_description
+
+    assert from_description("vestido negro largo") == "dresses"
+    assert from_description("Black Dress") == "dresses"
+    assert from_description("jeans de mezclilla") == "lower_body"
+    assert from_description("blusa de seda") == "upper_body"
+    assert from_description("algo raro") is None
+    assert detect("Vestido", "jeans") == "dresses"           # lo explicito gana
+    assert detect("auto", "falda plisada") == "lower_body"
+    assert detect(None, "sin pistas", classify=lambda: "Dress") == "dresses"
+    assert detect(None, "sin pistas", classify=lambda: "???") == "upper_body"
+    assert detect(None, "sin pistas", classify=lambda: (_ for _ in ()).throw(RuntimeError())) == "upper_body"
+
+
+def test_tryon_routes_category_to_pipeline():
+    seen = {}
+
+    def fake_tryon(garment, person, description, category="upper_body"):
+        seen["category"] = category
+        return b"base-bytes"
+
+    original = ai.tryon
+    ai.tryon = fake_tryon
+    try:
+        with TestClient(main.app) as client:
+            r = client.post("/tryon", files={"image": ("g.jpg", IMG, "image/jpeg")},
+                            data={"description": "vestido negro", "category": "auto"})
+            job = _wait_done(client, r.json()["id"])
+            assert job["status"] == "done" and job["category"] == "dresses"
+            assert seen["category"] == "dresses"
+    finally:
+        ai.tryon = original
