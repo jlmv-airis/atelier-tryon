@@ -3,12 +3,20 @@
 import { useEffect, useState } from "react";
 import UploadCard from "@/components/UploadCard";
 import ResultPanel from "@/components/ResultPanel";
-import { createTryOn, health, listResults, subscribeToJob, type TryOnJob } from "@/lib/api";
+import { createTryOn, health, listResults, subscribeToJob, type GarmentCategory, type TryOnJob } from "@/lib/api";
+
+const CATEGORIES: { value: GarmentCategory; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "upper_body", label: "Arriba" },
+  { value: "lower_body", label: "Abajo" },
+  { value: "dresses", label: "Vestido" },
+];
 
 export default function Home() {
   const [garment, setGarment] = useState<File | null>(null);
   const [person, setPerson] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<GarmentCategory>("auto");
   const [job, setJob] = useState<TryOnJob | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +42,7 @@ export default function Home() {
     setSubmitting(true);
     setError(null);
     try {
-      setJob(await createTryOn(garment, person, description));
+      setJob(await createTryOn(garment, person, description, category));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -71,6 +79,15 @@ export default function Home() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+            <div className="card">
+              <div className="segment" role="radiogroup" aria-label="Tipo de prenda">
+                {CATEGORIES.map((c) => (
+                  <button key={c.value} className={category === c.value ? "on" : ""} onClick={() => setCategory(c.value)}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {error && <div className="card error">{error}</div>}
             <button className="btn" disabled={!garment || submitting || online === false} onClick={submit}>
               {submitting ? "Enviando…" : "Generar look"}
