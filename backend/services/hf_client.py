@@ -1,5 +1,6 @@
 """Proveedores gratuitos de Hugging Face: Space IDM-VTON (try-on), Inference API (refinado, text2img, LLM)."""
 import io
+import logging
 import os
 import tempfile
 from functools import lru_cache
@@ -10,6 +11,8 @@ from huggingface_hub import InferenceClient
 from PIL import Image
 
 import config
+
+logger = logging.getLogger("tryon.hf")
 
 
 @lru_cache(maxsize=1)
@@ -108,7 +111,7 @@ def refine(image: bytes, prompt: str) -> bytes:
             guidance_scale=config.DIFFUSION_GUIDANCE,
             num_inference_steps=config.DIFFUSION_STEPS,
         )
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, KeyError):
         # Algunos proveedores rechazan parametros extra: reintento solo con el prompt
         output = client.image_to_image(image, prompt=prompt, model=config.HF_REFINE_MODEL)
     return _pil_to_jpeg(output)
@@ -122,16 +125,27 @@ def text_to_image(prompt: str, width: int = 768, height: int = 1024, seed: int |
     return _pil_to_jpeg(output)
 
 
+def _message_text(response) -> str:
+    message = response.choices[0].message
+    text = (getattr(message, "content", None) or "").strip()
+    if not text:  # modelos "thinking": el texto util puede venir en reasoning_content
+        text = (getattr(message, "reasoning_content", None) or getattr(message, "reasoning", None) or "").strip()
+    return text
+
+
 def _chat(model: str, content: list[dict], system: str) -> str:
-    response = _inference().chat_completion(
-        model=model,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
-        max_tokens=config.CLAUDE_MAX_TOKENS,
-        temperature=0.4,
-    )
-    text = (response.choices[0].message.content or "").strip()
+    client = _inference()
+    messages = [{"role": "system", "content": system + " /no_think"}, {"role": "user", "content": content}]
+    kwargs = dict(model=model, messages=messages, max_tokens=max(config.CLAUDE_MAX_TOKENS, 1200), temperature=0.4)
+    try:
+        response = client.chat_completion(
+            **kwargs, extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+        )
+    except Exception:
+        response = client.chat_completion(**kwargs)
+    text = _message_text(response)
     if not text:
-        raise RuntimeError("LLM devolvio texto vacio")
+        raise RuntimeError(f"LLM {model} devolvio texto vacio")
     return text.strip('"').strip()
 
 
@@ -142,6 +156,6 @@ def improve_prompt(system: str, description: str, image_url: str | None) -> str:
         try:
             image = {"type": "image_url", "image_url": {"url": image_url}}
             return _chat(config.HF_LLM_MODEL, [image, text], system)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("LLM con vision fallo (%s); probando solo texto", describe_error(exc))
     return _chat(config.HF_LLM_TEXT_MODEL, [text], system)
