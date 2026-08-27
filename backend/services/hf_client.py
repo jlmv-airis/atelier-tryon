@@ -38,15 +38,29 @@ def _path_to_jpeg(path: str) -> bytes:
         return _pil_to_jpeg(image)
 
 
+def _iter_candidates(node):
+    """Recorre recursivamente la salida del Space y produce posibles rutas/URLs de imagen."""
+    if node is None:
+        return
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for key in ("image", "path", "url", "value", "file"):
+            if key in node:
+                yield from _iter_candidates(node[key])
+        for key, value in node.items():
+            if key not in ("image", "path", "url", "value", "file"):
+                yield from _iter_candidates(value)
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _iter_candidates(item)
+
+
 def _first_path(result) -> str:
-    item = result[0] if isinstance(result, (list, tuple)) else result
-    if isinstance(item, dict) and isinstance(item.get("image"), dict):   # salida tipo Gallery
-        item = item["image"]
-    if isinstance(item, dict):
-        item = item.get("path") or item.get("url")
-    if not item or not Path(str(item)).exists():
-        raise RuntimeError(f"El Space no devolvio un archivo de imagen: {item!r}")
-    return str(item)
+    for candidate in _iter_candidates(result):
+        if Path(candidate).exists():
+            return candidate
+    raise RuntimeError(f"El Space no devolvio un archivo de imagen: {repr(result)[:300]}")
 
 
 def _space_client(space: str) -> Client:
