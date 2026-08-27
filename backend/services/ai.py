@@ -25,14 +25,24 @@ def tryon(garment: bytes, person: bytes, description: str) -> bytes:
     return hf_client.tryon(garment, person, description)
 
 
+CONSISTENCY_SUFFIX = (
+    " Keep the exact same model, identical full-body framing from head to shoes, the same standing pose, "
+    "the same garment shape, color and print, and the same plain background. Do not crop, zoom or change the composition."
+)
+
+
+def _with_consistency(prompt: str) -> str:
+    return prompt.rstrip() + CONSISTENCY_SUFFIX
+
+
 def improve_prompt(description: str, base_image_url: str) -> str:
     try:
         if config.prompt_provider() == "claude":
-            return call_claude(description, image_url=base_image_url)
-        return hf_client.improve_prompt(SYSTEM_PROMPT, description, base_image_url)
+            return _with_consistency(call_claude(description, image_url=base_image_url))
+        return _with_consistency(hf_client.improve_prompt(SYSTEM_PROMPT, description, base_image_url))
     except Exception as exc:
         logger.warning("mejora de prompt fallo (%s); usando prompt fijo", hf_client.describe_error(exc))
-        return FALLBACK_PROMPT
+        return _with_consistency(FALLBACK_PROMPT)
 
 
 def refine(base_image: bytes, base_image_url: str, prompt: str) -> bytes | None:
