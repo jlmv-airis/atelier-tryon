@@ -23,7 +23,7 @@ HF_TRYON_SPACE = _env("HF_TRYON_SPACE", "yisol/IDM-VTON")
 HF_TRYON_API_NAME = _env("HF_TRYON_API_NAME", "/tryon")
 HF_REFINE_MODEL = _env("HF_REFINE_MODEL", "black-forest-labs/FLUX.1-Kontext-dev")
 HF_TEXT2IMG_MODEL = _env("HF_TEXT2IMG_MODEL", "black-forest-labs/FLUX.1-schnell")
-HF_LLM_MODEL = _env("HF_LLM_MODEL", "Qwen/Qwen3-VL-8B-Instruct")
+HF_LLM_MODEL = _env("HF_LLM_MODEL", "Qwen/Qwen3.5-9B")
 HF_LLM_TEXT_MODEL = _env("HF_LLM_TEXT_MODEL", "Qwen/Qwen3.5-9B")
 HF_TIMEOUT = int(_env("HF_TIMEOUT", "600"))
 
