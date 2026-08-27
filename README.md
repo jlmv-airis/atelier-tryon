@@ -10,9 +10,9 @@ Web app móvil + backend FastAPI + pipeline IA (IDM-VTON → LLM → refinado) c
 
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
-| `bootstrap.yml` | manual, una vez | bucket + modelo por defecto + schema + variables Render/Vercel + deploys |
+| `bootstrap.yml` | manual, una vez | bucket + modelo por defecto + schema + variables Render + deploy backend |
 | `backend.yml` | push a `backend/**` | pytest → docker build → deploy Render → smoke `/health` |
-| `frontend.yml` | push a `frontend/**` | build → deploy Vercel |
+| `frontend.yml` | push a `frontend/**` | build check (Vercel despliega solo en cada push) |
 | `e2e.yml` | manual / lunes | try-on real contra producción, artefacto con imágenes |
 | `keepalive.yml` | cada 14 min (06–24 h CDMX) | ping `/health` para que Render Free no duerma |
 

@@ -9,15 +9,15 @@ Móvil (Safari/Chrome) ── Vercel Hobby (Next.js) ── Render Free (FastAPI
                     ▼                                   ▼                          ▼
         Hugging Face (gratis, HF_TOKEN)        Supabase Free                GitHub Actions (gratis)
         ① Space yisol/IDM-VTON  → try-on       Postgres: tryon_jobs         test → docker → deploy
-        ② Qwen2.5-VL (Inference) → prompt      Storage: bucket "tryon"     bootstrap · e2e · keepalive
-        ③ SDXL refiner (Inference) → refinado  (imágenes públicas)
+        ② Qwen3.5-9B (Inference) → prompt        Storage: bucket "tryon"     bootstrap · e2e · keepalive
+        ③ FLUX.2-klein-4B (Inference) → refinado  (imágenes públicas)
 ```
 
 Comportamiento del pipeline gratuito:
 
 - **Try-on** corre en el Space público de IDM-VTON (ZeroGPU). Hay cola: 1–5 min según carga. Con `HF_TOKEN` la cuota diaria es mayor que anónimo.
-- **Prompt**: LLM abierto con visión vía Inference API. Si falla, se usa un prompt editorial fijo y el job continúa.
-- **Refinado**: img2img vía Inference API con créditos mensuales gratuitos (limitados). Si falla o se agota la cuota, el job termina en `done` con la imagen base (`refined:false`). Poner `REFINE_REQUIRED=true` para que sea obligatorio.
+- **Prompt**: LLM abierto con visión (`Qwen/Qwen3.5-9B`) vía Inference API, con modo *thinking* desactivado. Al prompt se le añade siempre un sufijo de consistencia (misma persona, cuerpo entero, misma pose y fondo). Si falla, se usa un prompt editorial fijo y el job continúa.
+- **Refinado**: edición de imagen con `black-forest-labs/FLUX.1-Kontext-dev` vía Inference API (créditos mensuales gratuitos, limitados). Si falla o se agota la cuota, el job termina en `done` con la imagen base (`refined:false`). Poner `REFINE_REQUIRED=true` para que sea obligatorio.
 - **Claude** queda desactivado salvo que exista `ANTHROPIC_API_KEY` (de pago).
 - **Render Free** duerme tras 15 min sin uso; el primer request tarda ~50 s. `keepalive.yml` lo mantiene despierto de 06:00 a 24:00 (hora CDMX).
 
@@ -29,9 +29,9 @@ Comportamiento del pipeline gratuito:
 |---|---|---|
 | GitHub | github.com | Fine-grained token (ver §2) |
 | Hugging Face | huggingface.co/join | Settings → Access Tokens → New token (**Read**) → `HF_TOKEN` |
-| Supabase | supabase.com | Proyecto `atelier` → Settings → API: `Project URL`, `service_role`; Settings → Database → Connection string (URI, **Session pooler**) → `SUPABASE_DB_URL` |
+| Supabase | supabase.com | Proyecto `atelier` → Settings → API: `Project URL`, `service_role`; Settings → Database → contraseña de la base de datos → `SUPABASE_DB_PASSWORD` |
 | Render | render.com (login con GitHub) | Account Settings → API Keys → `RENDER_API_KEY`; servicio → URL `srv-...` en la barra → `RENDER_SERVICE_ID` |
-| Vercel | vercel.com (login con GitHub) | Account → Tokens → `VERCEL_TOKEN`; proyecto → Settings → `VERCEL_PROJECT_ID`; team → Settings → `VERCEL_ORG_ID` |
+| Vercel | vercel.com (login con GitHub) | Importar el repo con Root Directory `frontend` y `NEXT_PUBLIC_API_URL`; despliega solo en cada push |
 
 ---
 
@@ -51,7 +51,7 @@ Comportamiento del pipeline gratuito:
 
 5. New project `atelier` (guardar contraseña de la DB) → esperar "Active".
 6. Settings → API → copiar `Project URL` y `service_role`.
-7. Settings → Database → Connection string → **URI**, modo Session pooler → sustituir `[YOUR-PASSWORD]` → `SUPABASE_DB_URL`.
+7. Settings → Database → contraseña de la base de datos (la que generaste al crear el proyecto) → `SUPABASE_DB_PASSWORD`.
    (El schema y el bucket los crea el bootstrap; no tocar SQL Editor ni Storage a mano.)
 
 ### D. Render
@@ -65,8 +65,7 @@ Comportamiento del pipeline gratuito:
 
 12. vercel.com/new → Import `atelier-tryon` → Root Directory `frontend` → Deploy (aunque aún no conecte).
 13. Copiar URL `https://atelier-tryon.vercel.app` → `FRONTEND_URL`. Settings → General → `Project ID`; Team Settings → `Team ID` (= `VERCEL_ORG_ID`).
-14. Settings → Git → Ignored Build Step → `exit 0`.
-15. Account → Tokens → Create → `VERCEL_TOKEN`.
+14. Dejar la integración Git de Vercel activa: despliega sola en cada push a `main` (no configurar Ignored Build Step).
 
 ### F. Secrets y variables en GitHub (los pegas tú, no por el chat)
 
@@ -77,16 +76,13 @@ Repo → Settings → Secrets and variables → Actions:
 | `HF_TOKEN` | `BACKEND_URL` |
 | `SUPABASE_URL` | `FRONTEND_URL` |
 | `SUPABASE_SERVICE_KEY` | |
-| `SUPABASE_DB_URL` | |
+| `SUPABASE_DB_PASSWORD` (contraseña de la DB, sin codificar) | `SUPABASE_DB_HOST` (opcional; default pooler us-east-1) |
 | `RENDER_API_KEY` | |
 | `RENDER_SERVICE_ID` | |
-| `VERCEL_TOKEN` | |
-| `VERCEL_ORG_ID` | |
-| `VERCEL_PROJECT_ID` | |
 
 ### G. Bootstrap y verificación (lo lanzo yo por la API de GitHub)
 
-16. Workflow **Bootstrap** → crea bucket, genera `models/default.jpg` con FLUX (artefacto descargable para verla), aplica schema, carga variables en Render, despliega backend, carga env en Vercel, despliega frontend.
+16. Workflow **Bootstrap** → crea bucket, genera `models/default.jpg` con FLUX (artefacto descargable para verla), aplica schema, carga variables en Render y despliega el backend. El frontend lo despliega Vercel en cada push.
 17. Workflow **E2E** → try-on real con `assets/prenda-test.jpg` → artefacto con `base.png`, `final.jpg`, `job.json`.
 18. Prueba desde tu móvil (sección 3).
 
@@ -120,7 +116,14 @@ Repo → Settings → Secrets and variables → Actions:
 
 ---
 
-## 5. Criterio de "funcionando" (uso personal)
+## 5. Estado verificado (27-ago-2026)
+
+- Repo `jlmv-airis/atelier-tryon`; backend `https://tryon-api-q16h.onrender.com`; web `https://atelier-tryon-hazel.vercel.app`.
+- Bootstrap, backend CI/CD (push→deploy) y E2E en verde. E2E #3: try-on + prompt LLM + refinado en 1m17s.
+- Entrada: cualquier formato de imagen (HEIC de iPhone incluido) se normaliza a JPEG 1024px.
+- Secrets no usados que se pueden borrar: `SUPABASE_DB_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+
+## 6. Criterio de "funcionando" (uso personal)
 
 1. `/health` → `{"status":"ok","missing_env":[],"storage":true,"database":true,"ai_provider":"hf","prompt_provider":"hf"}`.
 2. Bootstrap y E2E en verde; artefacto `default-model` muestra una mujer de cuerpo completo 3:4 sobre fondo liso.
